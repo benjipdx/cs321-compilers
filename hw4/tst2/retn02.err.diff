@@ -1,0 +1,4 @@
+1c1
+< Checker$TypeException: Illegal Ast Stmt: null
+---
+> Checker$TypeException: (In MethodDecl) Missing return statement

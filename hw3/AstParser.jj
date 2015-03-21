@@ -1,0 +1,334 @@
+// (For CS321 Assignment 3. Winter'15)   
+// BEN REICHERT WI2015 HW3
+// miniJava AST parser 
+//
+
+//options { DEBUG_PARSER=true; }  /* Show debugging info */
+
+PARSER_BEGIN(AstParser)
+import java.util.*;
+import java.io.*;
+import ast.*;
+
+public class AstParser {
+  public static void main(String [] args) throws Exception {
+    if (args.length == 1) {
+      FileInputStream stream = new FileInputStream(args[0]);
+      Ast.Program p = new AstParser(stream).Program();
+      stream.close();
+      System.out.print(p);
+    } else {
+      System.out.println("Need one file name as command-line argument.");
+    }
+  }
+}
+PARSER_END(AstParser)
+
+//
+// LEXER SECTION ---------------------------------------------------------------
+//
+
+SKIP : /* White space */
+{
+  " " | "\t" | "\n" | "\r" | "\f"  
+}
+
+SKIP : /* Comments -- multi-line form and error detection not included */
+{
+  <"#" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
+}
+
+TOKEN : 
+{
+  <kwArrayElm:	  "ArrayElm">	  
+| <kwArrayType:	  "ArrayType">	   
+| <kwAssign:	  "Assign">	   
+| <kwBinop:	  "Binop">	   
+| <kwBoolType:	  "BoolType">	   
+| <kwCall:	  "Call">	     	   
+| <kwCallStmt:	  "CallStmt">	   
+| <kwClassDecl:	  "ClassDecl">	   
+| <kwElse:	  "Else">	     	  
+| <kwFalse:	  "False">	     	   
+| <kwField:	  "Field">	   
+| <kwIf:	  "If">	     	  
+| <kwIntType:	  "IntType">	   
+| <kwIntVal:	  "IntVal">	     	  
+| <kwMethodDecl:  "MethodDecl">     
+| <kwNewArray:	  "NewArray">	   
+| <kwNewObj:	  "NewObj">	   
+| <kwObjType:     "ObjType">     
+| <kwParam:	  "Param">	   
+| <kwPrint:	  "Print">	   
+| <kwReturn:	  "Return">	   
+| <kwStrVal:	  "StrVal">	     	   
+| <kwThis:	  "This">	     	   
+| <kwUnop:	  "Unop">	     	  
+| <kwVarDecl:	  "VarDecl">	   
+| <kwVoid:	  "void">	   
+| <kwWhile:       "While">          
+| <#BOOL:       "true"|"false">
+| <#DIGIT:        ["0"-"9"]>
+| <#LETTER:       (["A"-"Z"]|["a"-"z"])>
+}
+
+
+TOKEN : /* Integer literals */
+{
+  <IntLit: (<DIGIT>)+> 
+  { try { 
+      Integer.parseInt(matchedToken.image); 
+    } catch (Exception e) { 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". Integer overflow: " + matchedToken.image, 0);
+    } 
+  }
+}
+
+TOKEN : /* String literals */
+{
+  <StrLit: ("\"" (~["\"","\n"])* "\"")>
+}
+
+TOKEN : /* Identifiers */
+{
+  <Id: <LETTER> (<LETTER>|<DIGIT>)*>
+}
+
+TOKEN : /* Operators and delimiters */
+{
+   "+" | "-" | "*" | "/" | "&&" | "||" | "!" 
+|  "==" | "!=" | "<" | "<=" | ">" | ">="
+|  "=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
+}
+
+
+TOKEN : //boolean literals
+{
+  <BoolLit: (<BOOL>)>
+}
+
+//GRAMMAR STUFFS
+
+Ast.Program Program():
+{ List<Ast.ClassDecl> cl = new ArrayList<Ast.ClassDecl>(); 
+  Ast.ClassDecl c; 
+}
+{
+  ( c=ClassDecl() {cl.add(c);} )* <EOF> { return new Ast.Program(cl); }
+}
+
+
+//ClassDecl  -> "ClassDecl" <Id> [<Id>] {VarDecl} {MethodDecl}
+Ast.ClassDecl ClassDecl(): 
+{ Ast.Id className = null;
+List<Ast.VarDecl> variables = new ArrayList<Ast.VarDecl>();
+List<Ast.MethodDecl> methods = new ArrayList<Ast.MethodDecl>();
+Ast.Id parentName = null;
+Ast.VarDecl variable = null;
+Ast.MethodDecl method = null;
+}
+{
+"ClassDecl" className=Id() [parentName=Id()] 
+(variable = VarDecl() {variables.add(variable);})*
+(method = MethodDecl() {methods.add(method);})*
+{return new Ast.ClassDecl(className.nm,
+parentName==null ? null: parentName.nm,
+variables, 
+methods);}
+
+}
+
+Ast.Id Id():
+{Token token = null;}
+{
+  token=<Id> { String literal = new String(token.image);
+  return new Ast.Id(literal);}
+}
+
+
+//MethodDecl -> "MethodDecl" Type <Id> "(" {Param} ")" {VarDecl} {Stmt}
+Ast.MethodDecl MethodDecl(): 
+{ Ast.Type type;
+Ast.Param param;
+Ast.VarDecl var;
+Ast.Stmt stmt;
+List<Ast.Param> params = new ArrayList<Ast.Param>();
+List<Ast.VarDecl> vars = new ArrayList<Ast.VarDecl>();
+List<Ast.Stmt> stmts = new ArrayList<Ast.Stmt>();
+Ast.Id methodName;
+}
+{
+"MethodDecl" type = Type() methodName = Id() "("
+  (param = Param() {params.add(param);})* ")"
+  (var = VarDecl() {vars.add(var);})*
+  (stmt = Stmt() {stmts.add(stmt);})*
+{return new Ast.MethodDecl(type,methodName.nm,params,vars,stmts);}
+}
+
+//VarDecl    -> "VarDecl" Type <Id> Exp
+Ast.VarDecl VarDecl(): 
+{Ast.Type type;
+Ast.Id name;
+Ast.Exp exp;
+}
+{
+"VarDecl" type=Type() name = Id() exp=Exp()
+{return new Ast.VarDecl(type,name.nm,exp);}
+}
+
+//Param      -> "(" Type <Id> ")"
+Ast.Param Param(): 
+{Ast.Type type = null;
+Ast.Id name;
+}
+{
+"(" "Param" type=Type() name=Id() ")"
+{return new Ast.Param(type,name.nm);}
+}
+
+/*
+Type   -> "void" 
+       | "IntType" 
+       | "BoolType" 
+       | "(" ("ObjType" <Id> ")" | "ArrayType" Type ")")
+*/
+Ast.Type Type() :
+{ Ast.Id cn; Ast.Type t; }
+{
+  ( "void"                        { t = null; }
+  | "IntType"                     { t = new Ast.IntType(); }
+  | "BoolType"                    { t = new Ast.BoolType(); } 
+  | "(" ( "ObjType" cn=Id()       { t = new Ast.ObjType(cn.nm); }
+        | "ArrayType" t=Type()    { t = new Ast.ArrayType(t); } )
+    ")" )
+  { return t; }
+}
+
+
+/*
+Stmt   -> "{" {Stmt} "}"
+       |  "Assign" Exp Exp
+       |  "CallStmt" Exp <Id> "(" {Exp} ")"
+       |  "If" Exp Stmt [ "Else" Stmt ]  
+       |  "While" Exp Stmt
+       |  "Print" (Exp | <StrLit>)
+       |  "Return" Exp
+*/
+Ast.Stmt Stmt(): 
+{
+List<Ast.Stmt> stmts = new ArrayList<Ast.Stmt>();
+List<Ast.Exp> arguments = new ArrayList<Ast.Exp>();
+Ast.Exp arg;
+Ast.Stmt stmt;
+Ast.Block block;
+Ast.Exp lhs;
+Ast.Exp rhs;
+Ast.Exp callexp;
+Ast.Id id;
+Ast.Exp ifexp;
+Ast.Stmt stmt1 = null;
+Ast.Exp wexp;
+Ast.Exp rext;
+Ast.Exp prext;
+Ast.StrLit strlit;
+
+}
+{
+
+  "{" (stmt=Stmt() {stmts.add(stmt);})* "}" {return new Ast.Block(stmts);}
+  | "Assign" lhs=Exp() rhs=Exp() {return new Ast.Assign(lhs,rhs);}
+  | "CallStmt" callexp=Exp() id=Id() "(" (arg=Exp() {arguments.add(arg);})* ")" {return new Ast.CallStmt(callexp,id.nm,arguments);}
+  | "If" ifexp=Exp() stmt=Stmt() [LOOKAHEAD(2)"Else" stmt1=Stmt() ] {return new Ast.If(ifexp,stmt,stmt1);}
+  | "While" wexp=Exp() stmt=Stmt() {return new Ast.While(wexp,stmt);}
+  | "Print" ( prext=Exp() { return new Ast.Print(prext); }
+  | strlit=StrLit() { return new Ast.Print(strlit);} 
+  )
+  | "Return" rext = Exp() {return new Ast.Return(rext);}
+}
+
+
+Ast.StrLit StrLit():
+{Token token;}
+{
+  token=<StrLit> { String literal = new String(token.image.substring(1,token.image.length()-1));
+  return new Ast.StrLit(literal);}
+}
+
+
+Ast.Exp Exp(): 
+{
+List<Ast.Exp> arguments = new ArrayList<Ast.Exp>();
+Ast.Exp arg;
+Ast.BOP bin;
+Ast.Exp exp1;
+Ast.Exp exp2;
+Ast.UOP uop;
+Ast.Id id;
+Ast.Type type = null;
+Ast.IntLit intlit;
+Ast.BoolLit bool;
+Ast.Exp e = null;
+
+}
+{
+  ( "(" 
+  ["Binop" bin=BOP() exp1=Exp() exp2=Exp() {e =  new Ast.Binop(bin,exp1,exp2);} 
+  | "Unop" uop=UOP() exp1=Exp() {e =  new Ast.Unop(uop,exp1);}
+  | "Call" exp1=Exp() id=Id() "(" (arg=Exp() {arguments.add(arg);})* ")" {e = new Ast.Call(exp1,id.nm,arguments);}
+  | "NewObj" id=Id() {e = new Ast.NewObj(id.nm);}
+  | "Field" exp1=Exp() id=Id() /*")"*/ {e = new Ast.Field(exp1,id.nm);}
+  | "NewArray" type=Type() intlit=IntLit() /*")"*/ {e = new Ast.NewArray(type,intlit.i);}
+  | "ArrayElm" exp1=Exp() exp2=Exp() /*")"*/ {e =  new Ast.ArrayElm(exp1,exp2);} ]
+  ")"
+  | "This" {e = new Ast.This();}
+  | id=Id() {e = new Ast.Id(id.nm);}
+  | intlit = IntLit() {e = new Ast.IntLit(intlit.i);}
+  | bool = BoolLit() {e = new Ast.BoolLit(bool.b);}
+  )
+  {return e;}
+}
+
+Ast.IntLit IntLit():
+{Token token;}
+{
+  token=<IntLit> { int literal = Integer.parseInt(token.image);
+  return new Ast.IntLit(literal);}
+}
+
+
+Ast.BoolLit BoolLit():
+{Token token;}
+{
+  token=<BoolLit> { boolean literal = Boolean.parseBoolean(token.image);
+  return new Ast.BoolLit(literal);}
+}
+
+/*
+BOP    -> "+"  | "-"  | "*" | "/"  | "&&" | "||"
+       |  "==" | "!=" | "<" | "<=" | ">"  | ">=" 
+*/
+Ast.BOP BOP(): {}
+{
+  "+"  {return Ast.BOP.ADD;}
+  | "-"  {return Ast.BOP.SUB;}
+  | "*"  {return Ast.BOP.MUL;}
+  | "/"  {return Ast.BOP.DIV;}
+  | "&&" {return Ast.BOP.AND;}
+  | "||" {return Ast.BOP.OR;}
+  | "==" {return Ast.BOP.EQ;}
+  | "!=" {return Ast.BOP.NE;}
+  | "<"  {return Ast.BOP.LT;}
+  | "<=" {return Ast.BOP.LE;}
+  | ">"  {return Ast.BOP.GT;}
+  | ">=" {return Ast.BOP.GE;}
+}
+
+//UOP    -> "-" | "!"
+Ast.UOP UOP(): {}
+{
+  "-" { return Ast.UOP.NEG; } 
+  | "!" { return Ast.UOP.NOT; }
+}
+

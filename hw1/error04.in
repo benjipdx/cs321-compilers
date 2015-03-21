@@ -1,0 +1,3 @@
+//strings cannot span multiple lines
+"this is a multi
+line string"

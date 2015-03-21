@@ -1,0 +1,4 @@
+1c1
+< Checker$TypeException: (In Param) Can't find class A
+---
+> Checker$TypeException: (In CallStmt) Param and arg types don't match: (ObjType B) vs. (ObjType A)

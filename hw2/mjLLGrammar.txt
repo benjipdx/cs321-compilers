@@ -1,0 +1,57 @@
+//----------------------------------------------------------
+// Ben Reichert - Compilers I - February 2015
+// LL grammar for the miniJava Language (CS321 Winter 2015) 
+//----------------------------------------------------------
+
+Program    -> {ClassDecl}
+
+ClassDecl  -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
+
+MethodDecl -> "public" MethodDecl1 "{" {VarDecl} {MethodDecl} "}"
+
+MethodDecl1 -> ExtType <ID> "{" [Param] "}"
+            | "static" "void" "main" "{" "String" "[" "]" <ID> "}"
+
+Param      -> Type <ID> {"," Type <ID>}
+
+VarDecl    -> Type <ID> ["=" InitExpr] ";"
+
+ExtType    -> Type | "void" 
+
+Type       -> BasicType ["[" "]"]           // array type
+           |  <ID>                          // object type
+
+BasicType  -> "int" | "double" | "boolean"
+
+Stmt  	   -> "{" {Stmt} "}"                         // stmt block
+           | ExtId ("(" [Args] ")" ";" | [ "[" Expr "]" ] "=" InitExpr ";")
+           | "if" "(" Expr ")" Stmt ["else" Stmt]
+           | "while" "(" Expr ")" Stmt
+           | "System.out.println" "(" [ PrArg ] ")" ";"
+           | "return" [Expr] ";"
+				
+
+Args       -> Expr {"," Expr}
+
+PrArg      -> Expr | <STRLIT>
+
+InitExpr   -> "new" (BasicType "[" <INTLIT> "]" | <ID> "(" [Args] ")")
+           | Expr
+
+// Expr build the parse tree backwards so evaluation is in order of operators
+Expr	   -> Expr1 {"||" Expr1}
+Expr1      -> Expr2 {"&&" Expr2}
+Expr2	   -> Expr3 {Comp Expr3}
+Expr3	   -> Expr4 {("+" | "-") Expr4}
+Expr4	   -> Expr5 {("*" | "/") Expr5}
+Expr5	   -> Expr6 {("!"|"-") Expr6}
+Expr6	   -> "(" Expr ")" 
+           |  ExtId [ "(" [Args] ")" | "[" Expr "]" ]
+           |  Literal
+
+Comp       -> "==" | "!=" | "<" | ">" | "<=" | ">="
+
+ExtId      -> <ID> {"." <ID>} 
+           | "this" "." <ID> {"." <ID>} 		// object field or just ID
+
+Literal    -> <INTLIT> | <DBLLIT> | "true" | "false"

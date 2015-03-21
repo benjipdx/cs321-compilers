@@ -1,0 +1,297 @@
+// This is supporting software for CS321 Compilers and Language Design I
+// Copyright (c) Portland State University
+// Ben Reichert - February 2015 - Compilers I
+//
+//----------------------------------------------------------------------
+// miniJava Raw Grammar (JavaCC Specification)
+//
+// (For CS321 Winter 2015 - Jingke Li)
+//----------------------------------------------------------------------
+//
+//
+
+options { DEBUG_PARSER=true; }  /* Show debugging info */
+
+PARSER_BEGIN(mjLLGrammar)
+import java.io.*;
+
+public class mjLLGrammar {
+  public static void main(String [] args) {
+    try {
+      if (args.length == 1) {
+	FileInputStream stream = new FileInputStream(args[0]);
+	new mjLLGrammar(stream).Program();
+	stream.close();
+      } else {
+	System.out.println("Need a file name as command-line argument.");
+      }
+    } catch (TokenMgrError e) {
+      System.err.println(e);
+    } catch (Exception e) {
+      System.err.println(e);
+    }
+  }
+}
+PARSER_END(mjLLGrammar)
+
+//
+// LEXER SECTION ---------------------------------------------------------------
+//
+
+SKIP : /* White space */
+{
+  " " | "\t" | "\n" | "\r" | "\f"
+}
+
+SKIP : /* Comments -- multi-line form and error detection not included */
+{
+  <"//" (~["\n","\r"])* ("\n"|"\r"|"\r\n")> 
+}
+
+TOKEN : /* Keywords */
+{
+  "class" | "extends" | "static" | "public" | "void" | "int" | "double" 
+| "boolean" | "new" | "this" | "if" | "else" | "while" | "return" | "main"
+| "true" | "false"  | "String" | "System" | "out" | "println" 
+}
+
+TOKEN : /* Internal tokens */
+{
+  <#DIGIT:  ["0"-"9"]>
+| <#LETTER: (["A"-"Z"]|["a"-"z"])>
+}
+
+TOKEN : /* Integer literals */
+{
+  <INTLIT: (<DIGIT>)+> 
+  { try { 
+      Integer.parseInt(matchedToken.image); 
+    } catch (Exception e) { 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". Integer overflow: " + matchedToken.image, 0);
+    } 
+  }
+}
+
+TOKEN : /* Double literals */
+{
+  <DBLLIT: (<DIGIT>)+"."(<DIGIT>)*|(<DIGIT>)*"."(<DIGIT>)+> 
+  { try { 
+      Double.parseDouble(matchedToken.image); 
+    } catch (Exception e) { 
+      throw new TokenMgrError("Lexical error at line " + matchedToken.beginLine + 
+			      ", column " + matchedToken.beginColumn + 
+			      ". Malformed double: " + matchedToken.image, 0);
+    } 
+  }
+}
+
+TOKEN : /* String literals */
+{
+  <STRLIT: ("\"" (~["\"","\n"])* "\"")>
+}
+
+TOKEN : /* Identifiers */
+{
+  <ID: <LETTER> (<LETTER>|<DIGIT>)*>
+}
+
+TOKEN : /* Operators and delimiters */
+{
+   "+" | "-" | "*" | "/" | "&&" | "||" | "!" 
+|  "==" | "!=" | "<" | "<=" | ">" | ">="
+|  "=" | ";" | "," | "." | "(" | ")" | "[" | "]" | "{" | "}"
+}
+
+//
+// PARSER SECTION ---------------------------------------------------------------
+//
+
+// Program -> {ClassDecl}
+//
+void Program(): {}
+{
+  (ClassDecl())* <EOF>
+}
+
+//ClassDecl  -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
+//
+void ClassDecl(): {}
+{
+  "class" <ID> ["extends" <ID>] "{" (VarDecl())* (MethodDecl())* "}"
+}
+
+//MethodDecl -> "public" MethodDecl1 "{" {VarDecl} {MethodDecl} "}"
+//
+void MethodDecl(): {} 
+{
+  "public" MethodDecl1() "{" (LOOKAHEAD(2) VarDecl())* (Stmt())* "}"
+}
+
+//MethodDecl1 -> ExtType <ID> "{" [Param] "}"
+//            | "static" "void" "main" "{" "String" "[" "]" <ID> "}"
+//
+void MethodDecl1(): {}
+{
+ExtType() <ID> "(" [Param()] ")"
+|	"static" "void" "main" "(" "String" "[" "]" <ID> ")" 
+
+}
+
+//Param      -> Type <ID> {"," Type <ID>}
+//
+void Param(): {} 
+{
+	Type() <ID> ("," Type() <ID>)*
+}
+
+//VarDecl    -> Type <ID> ["=" InitExpr] ";"
+//
+void VarDecl(): {}
+{
+  Type() <ID> ["=" InitExpr()] ";"
+}
+
+//ExtType    -> Type | "void" 
+//
+void ExtType(): {}
+{
+  "void" | Type()
+}
+
+//Type       -> BasicType ["[" "]"]           // array type
+//           |  <ID>                          // object type
+//
+void Type(): {}
+{
+  BasicType() ["[" "]"]
+| <ID>
+}
+
+// BasicType -> "int" | "double" | "boolean"
+//
+void BasicType(): {}
+{
+  "int" | "double" | "boolean"
+}
+
+//Stmt     -> "{" {Stmt} "}"                         // stmt block
+//          | ExtId ("(" [Args] ")" ";" | [ "[" Expr "]" ] "=" InitExpr ";")
+//          | "if" "(" Expr ")" Stmt ["else" Stmt]
+//          | "while" "(" Expr ")" Stmt
+//          | "System.out.println" "(" [ PrArg ] ")" ";"
+//          | "return" [Expr] ";"
+//
+void Stmt(): {}
+{
+  "{" (Stmt())* "}"
+| ExtId() ("(" [Args()] ")" ";" | ["[" Expr() "]"] "=" InitExpr() ";")
+| "if" "(" Expr() ")" Stmt() ["else" Stmt()]
+| "while" "(" Expr() ")" Stmt()
+| "System" "." "out" "." "println" "(" [ PrArg() ] ")" ";"  
+| "return" [Expr()] ";"
+}
+
+
+// Args  -> Expr {"," Expr}
+//
+void Args(): {}
+{
+  Expr() ("," Expr())*
+}
+
+// PrArg -> Expr | <STRLIT>
+//
+void PrArg(): {}
+{
+  Expr() | <STRLIT>
+}
+
+//InitExpr   -> "new" (BasicType "[" <INTLIT> "]" | <ID> "(" [Args] ")")
+//           | Expr
+//
+void InitExpr(): {}
+{
+"new" (BasicType() "[" <INTLIT> "]" | <ID> "(" [Args()] ")")
+| Expr()
+}
+
+//Expr	   -> Expr1 {"||" Expr1}
+//
+void Expr(): {}
+{
+	Expr1() ("||" Expr1())*
+}
+
+//Expr1      -> Expr2 {"&&" Expr2}
+//
+void Expr1(): {}
+{
+	Expr2() ("&&" Expr2())*
+}
+
+//Expr2	   -> Expr3 {Comp Expr3}
+//
+void Expr2(): {}
+{
+	Expr3() (Comp() Expr3())*
+}
+
+//Expr3	   -> Expr4 {("+" | "-") Expr4}
+//
+void Expr3(): {}
+{
+	Expr4() (("+" | "-") Expr4())*
+}
+
+//Expr4	   -> Expr5 {("*" | "/") Expr5}
+//
+void Expr4(): {}
+{
+	Expr5() (("*" | "/") Expr5())*  
+}
+
+//Expr5	   -> Expr6 {("!"|"-") Expr6}
+//
+void Expr5(): {}
+{
+	("!" | "-")* Expr6()
+}
+
+/*
+Expr6	   -> "(" Expr ")" 
+           |  ExtId [ "(" [Args] ")" | "[" Expr "]" ]
+           |  Literal
+*/
+void Expr6(): {}
+{
+	"(" Expr() ")"
+|	ExtId() [ "(" [Args()] ")" | "[" Expr() "]" ]
+| Literal()
+
+}
+
+//Comp       -> "==" | "!=" | "<" | ">" | "<=" | ">="
+//
+void Comp(): {}
+{
+ "==" | "!=" | "<" | "<=" | ">" | ">="
+}
+
+
+//ExtId      -> <ID> {"." <ID>} 
+//           | "this" "." <ID> {"." <ID>} 		// object field or just ID
+//
+void ExtId(): {}
+{
+	<ID> ("." <ID>)*	
+|  "this" "." <ID> ("." <ID>)*
+}
+
+// Literal -> <INTLIT> | <DBLLIT> | "true" | "false"
+//
+void Literal(): {}
+{
+  <INTLIT> | <DBLLIT> | "true" | "false"
+}

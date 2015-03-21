@@ -1,0 +1,27 @@
+(3,1)	ID(class)
+(3,7)	ID(extends)
+(3,15)	ID(static)
+(3,22)	ID(public)
+(3,29)	ID(void)
+(3,34)	ID(int)
+(3,38)	double
+(3,45)	ID(boolean)
+(3,53)	ID(new)
+(3,57)	this
+(3,62)	ID(if)
+(3,65)	ID(else)
+(4,1)	ID(while)
+(4,7)	return
+(4,14)	ID(main)
+(4,19)	ID(String)
+(4,26)	true
+(4,31)	ID(false)
+(4,37)	ID(System)
+(4,44)	ID(out)
+(4,48)	ID(println)
+(6,1)	INTLIT(123)
+(6,5)	ID(lass)
+(8,1)	ID(System)
+(8,8)	ID(out)
+(8,12)	ID(println)
+Total: 26 tokens

@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# Script for running miniJava parser tests. 
+# (For CS321 Language and Compiler Design, Portland State University.)
+#
+# Usage:
+#   ./run tst/test01.ast.ref  -- test a single program 
+#   ./run tst/test*.ast.ref   -- test all programs
+#
+# The script will compare your parser's output with a ref file (if exists),
+# and save the diffs in a .diff file.
+#
+
+for i
+do
+	d=`dirname $i`
+	f=`basename $i .ast.ref`
+	echo -n "$d/$f: "
+	java AstParser $d/$f.ast.ref 1> $d/$f.ast
+        diff -w $d/$f.ast $d/$f.ast.ref > $d/$f.ast.diff; 
+        if [ -s $d/$f.ast.diff ]; then 
+          echo "differs from ref (see $f.ast.diff)"; 
+        else
+          echo "matches ref"; 
+          rm $d/$f.ast.diff; 
+        fi
+done
+exit 0
+

@@ -1,0 +1,58 @@
+//--------------------------------------------------------
+// miniJava AST grammar (for CS321) 
+//
+// Jingke Li, Portland State University
+//--------------------------------------------------------
+
+Program    -> {ClassDecl}
+ClassDecl  -> "ClassDecl" <Id> [<Id>] {VarDecl} {MethodDecl}
+MethodDecl -> "MethodDecl" Type <Id> "(" {Param} ")" {VarDecl} {Stmt}
+VarDecl    -> "VarDecl" Type <Id> Exp
+Param      -> "(" Type <Id> ")"
+
+Type   -> "void" 
+       | "IntType" 
+       | "BoolType" 
+       | "(" ("ObjType" <Id> ")" | "ArrayType" Type ")")
+     
+Stmt   -> "{" {Stmt} "}"
+       |  "Assign" Exp Exp
+       |  "CallStmt" Exp <Id> "(" {Exp} ")"
+       |  "If" Exp Stmt [ "Else" Stmt ]  
+       |  "While" Exp Stmt
+       |  "Print" (Exp | <StrLit>)
+       |  "Return" Exp
+
+Exp    -> "(" (
+       |  "Binop" BOP Exp Exp ")"
+       |  "Unop" UOP Exp ")"
+       |  "Call" Exp <Id> "(" {Exp} ")" ")"
+       |  "NewObj" <Id> ")"
+       |  "Field" Exp <Id> ")"
+       |  "NewArray" Type <IntLit> ")"
+       |  "ArrayElm" Exp Exp ")" )
+       |  "This"
+       |  <Id>
+       |  <IntLit>
+       |  <BoolLit>
+
+BOP    -> "+"  | "-"  | "*" | "/"  | "&&" | "||"
+       |  "==" | "!=" | "<" | "<=" | ">"  | ">=" 
+
+UOP    -> "-" | "!"
+
+//-------------------
+// Token Definitions
+//-------------------
+
+<IntLit>  = [0-9]+
+<BoolLit> = "true"|"false"
+<StrLit>  = \"(~[\",\n])*\"  
+<Id>      = [A-Za-z_][A-Za-z0-9_]* 
+
+//----------
+// Comments
+//----------
+
+Any characters starting from # to the end of the line.
+
